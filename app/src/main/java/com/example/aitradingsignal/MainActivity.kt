@@ -2,17 +2,17 @@
 package com.example.aitradingsignal
 
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.view.Gravity
-import android.view.View
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
@@ -20,10 +20,36 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var statusText: TextView
     private lateinit var signalText: TextView
+    private lateinit var infoText: TextView
 
     private val backgroundColor = Color.rgb(8, 13, 24)
     private val panelColor = Color.rgb(20, 29, 44)
     private val greenColor = Color.rgb(0, 200, 150)
+
+    private val captureLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+
+            if (result.resultCode == RESULT_OK &&
+                result.data != null
+            ) {
+                ScreenCaptureManager.startCapture(
+                    this,
+                    result.resultCode,
+                    result.data!!
+                )
+
+                statusText.text = "Status: Screen capture permitted"
+                infoText.text =
+                    "Screen capture started. AI analysis is not connected yet."
+            } else {
+                signalText.text = "WAIT"
+                statusText.text = "Status: Capture permission denied"
+                infoText.text =
+                    "Screen capture permission is required."
+            }
+        }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,7 +105,8 @@ class MainActivity : AppCompatActivity() {
                     error: android.webkit.WebResourceError?
                 ) {
                     if (request?.isForMainFrame == true) {
-                        statusText.text = "Status: Page loading failed"
+                        statusText.text =
+                            "Status: Page loading failed"
                     }
                 }
             }
@@ -110,7 +137,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(8, 12, 8, 12)
         }
 
-        val infoText = TextView(this).apply {
+        infoText = TextView(this).apply {
             text = "AI analysis is not started yet"
             textSize = 12f
             setTextColor(Color.LTGRAY)
@@ -127,21 +154,26 @@ class MainActivity : AppCompatActivity() {
             setOnClickListener {
                 signalText.text = "WAIT"
                 signalText.setTextColor(Color.YELLOW)
-                infoText.text =
-                    "Screen analysis will be added in the next steps."
-                Toast.makeText(
-                    this@MainActivity,
-                    "Analysis system is not connected yet",
-                    Toast.LENGTH_SHORT
-                ).show()
+                infoText.text = "Requesting screen capture permission..."
+
+                captureLauncher.launch(
+                    ScreenCaptureManager.createCaptureIntent(
+                        this@MainActivity
+                    )
+                )
             }
         }
 
         val stopButton = Button(this).apply {
             text = "Stop"
             setOnClickListener {
+                ScreenCaptureManager.stopCapture(
+                    this@MainActivity
+                )
+
                 signalText.text = "WAIT"
                 signalText.setTextColor(Color.YELLOW)
+                statusText.text = "Status: Capture stopped"
                 infoText.text = "Analysis stopped"
             }
         }
@@ -193,4 +225,3 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 }
-
